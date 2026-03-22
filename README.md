@@ -37,5 +37,5 @@ It features live log streaming via WebSockets, device latency monitoring, and se
 ``systemctl restart isc-dhcp-server``
 
 ### Clone the repo
-``cd /opt; git clone http 
+``cd /opt; git clone https://github.com/markdesilva/DHCP-GUARD.git``
   
