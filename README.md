@@ -28,15 +28,41 @@ It features live log streaming via WebSockets, device latency monitoring, and se
 
 ## Installation
 ### Setting up RSyslog
-``echo "local7.* /var/log/dhcpd.log" > /etc/rsyslog.d/dhcpd.log``
+```
+echo "local7.* /var/log/dhcpd.log" > /etc/rsyslog.d/dhcpd.log
+echo "log-facility local7;" >> /etc/dhcp/dhcpd.conf
+systemctl restart rsyslog
+systemctl restart isc-dhcp-server
+```
 
-``echo "log-facility local7;" >> /etc/dhcp/dhcpd.conf``
+### Setting up Logrotate
++ Edit /etc/logrotate.d/dhcpd
++ Add the following and save the file
+```
+/var/log/dhcpd.log {
+    rotate 7
+    daily
+    missingok
+    notifempty
+    compress
+    delaycompress
+    sharedscripts
+    postrotate
+        /usr/lib/rsyslog/rsyslog-rotate
+    endscript
+}
+```
 
-``systemctl restart rsyslog``
-
-``systemctl restart isc-dhcp-server``
-
-### Clone the repo
+### Clone the repo into /opt
 ``cd /opt; git clone https://github.com/markdesilva/DHCP-GUARD.git``
+
+### Preparing the Python environment
+```
+cd /opt/dhcp-guard
+apt install python3.10-venv
+python3 -m venv venv
+source venv/bin/activate
+pip install fastapi uvicorn httpx uvicorn websockets aiosqlite pydantic install "bcrypt==4.0.1"
+```
   
 TO BE CONTINUED
