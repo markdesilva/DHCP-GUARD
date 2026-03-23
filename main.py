@@ -274,6 +274,17 @@ async def service_control(action: str):
         return {"status": "success", "message": f"DHCP service {action}ed"}
     except Exception as e: return {"status": "error", "message": str(e)}
 
+# --- NEW: DHCP SERVICE STATUS CHECK ---
+@app.get("/api/service/status")
+async def get_service_status():
+    try:
+        # We use check_call style to see if service is active
+        result = subprocess.run(["systemctl", "is-active", "isc-dhcp-server"], capture_output=True, text=True)
+        is_active = result.stdout.strip() == "active"
+        return {"active": is_active}
+    except:
+        return {"active": False}
+
 @app.post("/api/add-host")
 async def add_host(res: NewReservation):
     ip_pattern = r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$"

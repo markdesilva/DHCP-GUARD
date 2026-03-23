@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DHCP Guard | BIC-NETWORK</title>
+    <title>DHCP Guard | ISC-DHCP-SERVER WEB-UI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -42,7 +42,7 @@
                     <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                 </div>
                 <h2 class="text-xl font-black uppercase tracking-tight">System Access</h2>
-                <p class="text-xs text-slate-400 font-bold mt-1 tracking-widest uppercase">BIC-NETWORK</p>
+                <p class="text-xs text-slate-400 font-bold mt-1 tracking-widest uppercase">DHCP-GUARD</p>
             </div>
             <form onsubmit="handleLogin(event)" class="space-y-4">
                 <input id="l-user" type="text" placeholder="Username" required class="w-full p-3 bg-slate-50 border rounded-xl text-sm outline-none focus:border-blue-500 font-semibold">
@@ -112,7 +112,7 @@
                     <button onclick="controlService('stop')" class="p-1.5 hover:bg-white rounded text-red-600 active:scale-90 transition-all"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg></button>
                     <button onclick="controlService('restart')" class="p-1.5 hover:bg-white rounded text-blue-600 active:scale-90 transition-all"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></button>
                 </div>
-                <div class="h-2.5 w-2.5 bg-green-500 rounded-full shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse"></div>
+                <div id="service-status-dot" class="h-2.5 w-2.5 bg-slate-300 rounded-full transition-all duration-300 shadow-sm"></div>
             </div>
         </header>
 
@@ -135,6 +135,12 @@
             </section>
 
             <section id="view-tiles" class="content-pane hidden">
+                <div class="mb-4 flex items-center space-x-2">
+                    <span class="text-[10px] font-black uppercase text-slate-400">Sort By:</span>
+                    <button onclick="setSort('name')" id="sort-name" class="px-3 py-1 rounded-full bg-blue-600 text-white text-[9px] font-bold uppercase tracking-wider">Hostname</button>
+                    <button onclick="setSort('ip')" id="sort-ip" class="px-3 py-1 rounded-full bg-slate-200 text-slate-600 text-[9px] font-bold uppercase tracking-wider">IP Address</button>
+                </div>
+
                 <div class="bg-white border border-slate-200 rounded-2xl shadow-sm mb-6 overflow-hidden">
                     <div class="px-5 py-2 border-b border-slate-50 flex justify-between items-center bg-white">
                         <div class="flex items-center space-x-3">
@@ -244,6 +250,8 @@
         let heroChart = null;
         let currentFontSize = 13;
         let allKnownHosts = [];
+        let currentSortMode = 'name';
+        let activeSubnetData = null;
 
         async function handleLogin(e) {
             e.preventDefault();
@@ -258,8 +266,9 @@
                 });
                 
                 if (res.ok) {
+                    localStorage.setItem('dhcp_auth', 'true');
                     document.getElementById('login-overlay').classList.add('hidden');
-                    document.getElementById('l-pass').value = ''; // Clear for security
+                    document.getElementById('l-pass').value = ''; 
                     showToast("Access Granted");
                     init(); 
                 } else {
@@ -270,23 +279,17 @@
             }
         }
 
-        // LOGOUT LOGIC
-function handleLogout() {
-    if(confirm("Confirm security log out?")) {
-        // 1. Clear any local sensitive data
-        document.getElementById('l-user').value = '';
-        document.getElementById('l-pass').value = '';
-        
-        // 2. Hide all content panes and show login
-        document.querySelectorAll('.content-pane').forEach(p => p.classList.add('hidden'));
-        document.getElementById('login-overlay').classList.remove('hidden');
-        
-        // 3. Optional: Hard reload to clear JavaScript memory/variables
-        // window.location.reload(); 
-        
-        showToast("Session Terminated");
-    }
-}
+        function handleLogout() {
+            if(confirm("Confirm security log out?")) {
+                localStorage.removeItem('dhcp_auth');
+                document.getElementById('l-user').value = '';
+                document.getElementById('l-pass').value = '';
+                document.querySelectorAll('.content-pane').forEach(p => p.classList.add('hidden'));
+                document.getElementById('login-overlay').classList.remove('hidden');
+                showToast("Session Terminated");
+            }
+        }
+
         async function refreshUserList() {
             try {
                 const res = await fetch('/api/settings/list-users');
@@ -346,21 +349,30 @@ function handleLogout() {
             document.getElementById('view-' + id).classList.remove('hidden');
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('nav-active'));
             if(el) el.classList.add('nav-active');
-            document.getElementById('view-title').innerText = id.replace('-', ' ');
+            
+            const titleElement = document.getElementById('view-title');
+            if (id === 'tiles') titleElement.innerText = 'CLIENTS'; 
+            else if (id === 'logs') titleElement.innerText = 'LIVE ACTIVITY';
+            else if (id === 'config') titleElement.innerText = 'ADMIN';
+            else titleElement.innerText = id.replace('-', ' ').toUpperCase();
+            
             if(id === 'config') refreshHostnames();
             if(id === 'settings') refreshUserList();
-            // Update the header logic here
-            const titleElement = document.getElementById('view-title');
-            if (id === 'tiles') {
-               titleElement.innerText = 'CLIENTS'; // Changes TILES to CLIENTS
-            } else if (id === 'logs') {
-               titleElement.innerText = 'LIVE ACTIVITY';
-            } else if (id === 'config') {
-               titleElement.innerText = 'ADMIN';
-            } else {
-               titleElement.innerText = id.replace('-', ' ').toUpperCase();
-            }
+        }
 
+        // --- NEW: SERVICE STATUS DYNAMIC UPDATER ---
+        async function updateServiceStatus() {
+            try {
+                const res = await fetch('/api/service/status');
+                const data = await res.json();
+                const dot = document.getElementById('service-status-dot');
+                
+                if (data.active) {
+                    dot.className = "h-2.5 w-2.5 bg-green-500 rounded-full shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse transition-all";
+                } else {
+                    dot.className = "h-2.5 w-2.5 bg-red-500 rounded-full shadow-[0_0_8px_rgba(239,68,68,0.6)] transition-all";
+                }
+            } catch (e) { console.error("Status check failed"); }
         }
 
         async function init() {
@@ -387,6 +399,10 @@ function handleLogout() {
             const select = document.getElementById('f-target');
             select.innerHTML = '<option value="main">dhcpd.conf</option>';
             configSchema.includes.forEach(inc => select.innerHTML += `<option value="${inc}">${inc}</option>`);
+
+            // Start Status Polling every 5 seconds
+            updateServiceStatus();
+            setInterval(updateServiceStatus, 5000);
         }
 
         async function refreshHostnames() {
@@ -418,15 +434,37 @@ function handleLogout() {
             } else { badge.className = "absolute right-3 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-slate-200"; }
         });
 
+        function setSort(mode) {
+            currentSortMode = mode;
+            document.getElementById('sort-name').className = mode === 'name' ? 'px-3 py-1 rounded-full bg-blue-600 text-white text-[9px] font-bold uppercase tracking-wider' : 'px-3 py-1 rounded-full bg-slate-200 text-slate-600 text-[9px] font-bold uppercase tracking-wider';
+            document.getElementById('sort-ip').className = mode === 'ip' ? 'px-3 py-1 rounded-full bg-blue-600 text-white text-[9px] font-bold uppercase tracking-wider' : 'px-3 py-1 rounded-full bg-slate-200 text-slate-600 text-[9px] font-bold uppercase tracking-wider';
+            if (activeSubnetData) loadSubnet(activeSubnetData.sub, activeSubnetData.navEl);
+        }
+
         async function loadSubnet(sub, navEl) {
+            activeSubnetData = { sub, navEl };
             switchTab('tiles', navEl);
             const res = await fetch('/api/data');
             const data = await res.json();
             const grid = document.getElementById('tile-grid');
             grid.innerHTML = '';
+            
             const startLimit = parseInt(sub.range.split(' - ')[0].split('.').pop());
             const endLimit = parseInt(sub.range.split(' - ')[1].split('.').pop());
-            const filtered = data.hosts.filter(h => h.ip && h.ip.startsWith(sub.prefix) && (parseInt(h.ip.split('.').pop()) >= startLimit && parseInt(h.ip.split('.').pop()) <= endLimit));
+            
+            let filtered = data.hosts.filter(h => h.ip && h.ip.startsWith(sub.prefix) && 
+                (parseInt(h.ip.split('.').pop()) >= startLimit && parseInt(h.ip.split('.').pop()) <= endLimit));
+
+            filtered.sort((a, b) => {
+                if (currentSortMode === 'ip') {
+                    const ipToNum = ip => ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet, 10), 0) >>> 0;
+                    return ipToNum(a.ip) - ipToNum(b.ip);
+                } else {
+                    const nameA = (a.name || a.hostname || "").toLowerCase();
+                    const nameB = (b.name || b.hostname || "").toLowerCase();
+                    return nameA.localeCompare(nameB);
+                }
+            });
 
             filtered.forEach((item, index) => {
                 const color = item.status === 'online' ? 'bg-emerald-500' : 'bg-red-500';
@@ -552,7 +590,12 @@ function handleLogout() {
 
         function clearLogs() { document.getElementById('log-content').innerHTML = ''; }
         function adjustLogFont(d) { currentFontSize += d; document.getElementById('log-window').style.fontSize = currentFontSize + 'px'; }
-        async function controlService(a) { await fetch(`/api/service/${a}`, { method: 'POST' }); }
+        
+        async function controlService(a) { 
+            await fetch(`/api/service/${a}`, { method: 'POST' });
+            updateServiceStatus(); // Immediate UI feedback
+        }
+
         function applyLogFilter() {
             const f = document.getElementById('log-filter').value.toLowerCase();
             document.querySelectorAll('.log-line').forEach(l => l.style.display = l.innerText.toLowerCase().includes(f) ? 'block' : 'none');
@@ -572,6 +615,13 @@ function handleLogout() {
                 else { showToast(data.message || "Error saving host", false); }
             } catch (error) { showToast("Network error: Server unreachable", false); }
         }
+
+        window.onload = () => {
+            if (localStorage.getItem('dhcp_auth') === 'true') {
+                document.getElementById('login-overlay').classList.add('hidden');
+                init();
+            }
+        };
 
     </script>
 </body>
