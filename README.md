@@ -9,7 +9,7 @@ Despite having plenty of ideas, trying to get the AI to remember what it did rig
 I call it v1.10 but its more like 1.1000 after all the back and forth.
 
 ## Description
-DHCP Guard is a modern, lightweight FastAPI application designed to provide a real-time dashboard and management interface for the Linux isc-dhcp-server. 
+DHCP Guard is a modern, lightweight FastAPI application designed to provide a real-time dashboard and management interface for the Linux isc-dhcp-server for fixed IP client reservations. 
 
 It features live log streaming via WebSockets, device latency monitoring, and secure static host registration.
 
