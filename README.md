@@ -330,6 +330,7 @@ password: password
 
 + Clicking on the *Details* footer at the base of the tile will pull up a form which you can add information for the clients (Description, Admin, Comments) - this information is saved seperately from the dhcp conf files.
 + The trash can icon in the form can be used to delete the host completely from the dhcp conf files and all information assigned to the host - USE WITH CAUTION!
++ You can set client information (Description, Admin, Comments) for *LEASE* clients, but you can't delete them, you will get a HOST not found error.
 
 
 <img width="422" height="496" alt="image" src="https://github.com/user-attachments/assets/efd03ac4-0f5a-4fd8-a7cc-b8c3cc011315" />
