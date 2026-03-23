@@ -1,5 +1,5 @@
 # DHCP-GUARD
-Vibe coded (and heavly human edited) Web-Based Management for ISC-DHCP-Server
+Vibe coded (and heavly human edited) Web-Based Management for ISC-DHCP-Server for fixed IP client reservations.
 
 ## History
 ISC has moved to KEA DHCP and has their own UI, but didn't really meet what I needed and I still had multiple installations running off isc-dhcp-server. [Akkadius/glass-isc-dhcp](https://github.com/Akkadius/glass-isc-dhcp) while rich in features, didn't manage fixed IP reservations. We make users register their machines for DHCP, so fixed IP client reservations were a must and hence I decided to make use of AI to vibe code a simple UI for what I needed. 
