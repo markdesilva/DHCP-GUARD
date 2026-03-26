@@ -91,8 +91,8 @@ systemctl restart apache2
     DocumentRoot /opt/dhcp-guard
 
     SSLEngine on
-    SSLCertificateFile </full/path/to/your/certfile>
-    SSLCertificateKeyFile </full/path/to/your/keyfile>
+    SSLCertificateFile /full/path/to/your/certfile
+    SSLCertificateKeyFile /full/path/to/your/keyfile
 
     <Directory /opt/dhcp-guard>
         Options FollowSymLinks
