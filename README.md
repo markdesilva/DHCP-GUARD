@@ -389,3 +389,6 @@ password: password
 
 ### TO DO
 + Make the ping graph update without refreshing the page (non priority target)
+
+### TO NEVER DO
++ Edit DHCP config options (other than hosts) directly from the UI 
