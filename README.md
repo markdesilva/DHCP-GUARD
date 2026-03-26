@@ -1,9 +1,25 @@
 # UPDATES (26th March 2026)
 + Added live stream for /var/lib/dhcp/dhcpd.leases under 'Live Activity' (new side panel entries)
+
+<img width="152" height="134" alt="image" src="https://github.com/user-attachments/assets/52ca0865-c928-4022-a83b-f072cd8723bd" />
+
 + Added sort tiles by live hosts to 'Network Segments' subnets 
+
+<img width="321" height="105" alt="image" src="https://github.com/user-attachments/assets/109ba1d2-dbbc-42a6-8816-35e503b135b6" />
+
 + Changed "Static Registration" to "Static Registration/Modification" under 'Add Host'
+
+<img width="540" height="167" alt="image" src="https://github.com/user-attachments/assets/6cb8092b-a1b1-4ba0-bd99-47c32d554307" />
+
 + Changed "Systems Administration" to "User Administration" under 'Settings'
 
+<img width="346" height="163" alt="image" src="https://github.com/user-attachments/assets/74812051-d38c-45c2-8f85-ed3698326d8d" />
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
 
 # DHCP-GUARD
 Vibe coded (and heavly human edited) Web-Based Management for ISC-DHCP-Server for leased and fixed IP client reservations.
