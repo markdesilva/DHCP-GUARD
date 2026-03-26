@@ -349,6 +349,28 @@ async def websocket_endpoint(websocket: WebSocket):
                 else: await asyncio.sleep(0.5)
     except: pass
 
+# --- ADD THIS TO THE WEBSOCKET SECTION ---
+@app.websocket("/ws/leases")
+async def websocket_leases_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        # Streams the raw leases file content as it updates
+        with open(LEASES_FILE, "r", 1) as f:
+            # Send current content first so the window isn't empty
+            content = f.read()
+            if content:
+                await websocket.send_text(content)
+
+            f.seek(0, os.SEEK_END)
+            while True:
+                line = f.readline()
+                if line: 
+                    await websocket.send_text(line)
+                else: 
+                    await asyncio.sleep(1) # Leases update less frequently than logs
+    except Exception as e:
+        print(f"Lease WS Error: {e}")
+
 app.mount("/", StaticFiles(directory="/opt/dhcp-guard", html=True), name="static")
 
 if __name__ == "__main__":

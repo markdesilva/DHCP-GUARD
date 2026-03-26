@@ -60,10 +60,27 @@
         </div>
 
         <nav id="sidebar-nav" class="flex-1 p-3 space-y-1 overflow-y-auto hide-scroll">
+<!--
             <button id="default-nav" onclick="switchTab('logs', this)" class="nav-item nav-active w-full p-2.5 rounded flex items-center transition-all text-sm font-bold">
                 <svg class="w-5 h-5 mr-3 flex-shrink-0 text-orange-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
                 <span>Live Activity</span>
             </button>
+-->
+
+<div class="w-full p-2.5 flex items-center text-sm font-bold text-slate-200">
+    <svg class="w-5 h-5 mr-3 flex-shrink-0 text-orange-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+    <span>Live Activity</span>
+</div>
+<div class="pl-6 space-y-1 mb-4">
+    <button id="default-nav" onclick="switchLogStream('logs', this)" class="nav-item nav-active w-full p-2 rounded hover:bg-slate-800 text-slate-400 font-bold transition-all flex items-center text-xs">
+        <svg class="w-3.5 h-3.5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        <span>dhcpd.log</span>
+    </button>
+    <button onclick="switchLogStream('leases', this)" class="nav-item w-full p-2 rounded hover:bg-slate-800 text-slate-400 font-bold transition-all flex items-center text-xs">
+        <svg class="w-3.5 h-3.5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+        <span>dhcpd.leases</span>
+    </button>
+</div>
 
             <div class="my-4 border-t border-slate-800/50"></div>
             <div class="w-full p-2.5 flex items-center text-sm font-bold text-slate-200">
@@ -99,7 +116,7 @@
 
         <div class="p-5 border-t border-slate-800 bg-slate-950/50">
             <div class="text-[11px] font-black text-slate-200 uppercase tracking-wider leading-none">Written by Google Gemini</div>
-            <div class="text-[9px] text-slate-500 font-medium mt-1">Designed by Mark De Silva</div>
+            <div class="text-[9px] text-slate-500 font-medium mt-1">Designed and modified by Mark De Silva</div>
         </div>
     </aside>
 
@@ -139,6 +156,7 @@
                     <span class="text-[10px] font-black uppercase text-slate-400">Sort By:</span>
                     <button onclick="setSort('name')" id="sort-name" class="px-3 py-1 rounded-full bg-blue-600 text-white text-[9px] font-bold uppercase tracking-wider">Hostname</button>
                     <button onclick="setSort('ip')" id="sort-ip" class="px-3 py-1 rounded-full bg-slate-200 text-slate-600 text-[9px] font-bold uppercase tracking-wider">IP Address</button>
+                    <button onclick="setSort('status')" id="sort-status" class="px-3 py-1 rounded-full bg-slate-200 text-slate-600 text-[9px] font-bold uppercase tracking-wider">Status</button>
                 </div>
 
                 <div class="bg-white border border-slate-200 rounded-2xl shadow-sm mb-6 overflow-hidden">
@@ -157,12 +175,12 @@
                 <div class="max-w-lg mx-auto bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden p-8 mt-4">
                     <h2 class="text-lg font-black uppercase mb-6 tracking-tight flex items-center">
                         <svg class="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4"/></svg>
-                        Static Registration
+                        Static Registration/Modification
                     </h2>
                     <form onsubmit="event.preventDefault(); saveHost();" class="space-y-4">
                         <div class="grid grid-cols-2 gap-3 relative">
                             <div class="relative">
-                                <input id="f-name" list="hostnames-list" type="text" placeholder="Hostname" required title="Please enter a valid hostname" class="w-full p-3 bg-slate-50 border rounded-xl text-sm outline-none focus:border-blue-500 font-semibold pr-10">
+                                <input id="f-name" list="hostnames-list" type="text" placeholder="Hostname" required title="Please enter a new hostname or double click to select a hostname to modify" class="w-full p-3 bg-slate-50 border rounded-xl text-sm outline-none focus:border-blue-500 font-semibold pr-10">
                                 <datalist id="hostnames-list"></datalist>
                                 <div id="f-status-badge" class="absolute right-3 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-slate-200 transition-colors"></div>
                             </div>
@@ -188,7 +206,7 @@
                     <div class="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden p-8">
                         <h2 class="text-lg font-black uppercase mb-6 tracking-tight flex items-center">
                             <svg class="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
-                            System Administration
+                            User Administration
                         </h2>
                         <div class="grid md:grid-cols-2 gap-8">
                             <form onsubmit="event.preventDefault(); addAdmin();" class="space-y-3">
@@ -271,6 +289,8 @@
                     document.getElementById('l-pass').value = ''; 
                     showToast("Access Granted");
                     init(); 
+                    const defaultBtn = document.getElementById('default-nav');
+                    if (defaultBtn) switchLogStream('logs', defaultBtn);
                 } else {
                     showToast("Invalid Credentials", false);
                 }
@@ -434,12 +454,25 @@
             } else { badge.className = "absolute right-3 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-slate-200"; }
         });
 
+        //function setSort(mode) {
+        //    currentSortMode = mode;
+        //    document.getElementById('sort-name').className = mode === 'name' ? 'px-3 py-1 rounded-full bg-blue-600 text-white text-[9px] font-bold uppercase tracking-wider' : 'px-3 py-1 rounded-full bg-slate-200 text-slate-600 text-[9px] font-bold uppercase tracking-wider';
+        //    document.getElementById('sort-ip').className = mode === 'ip' ? 'px-3 py-1 rounded-full bg-blue-600 text-white text-[9px] font-bold uppercase tracking-wider' : 'px-3 py-1 rounded-full bg-slate-200 text-slate-600 text-[9px] font-bold uppercase tracking-wider';
+        //    if (activeSubnetData) loadSubnet(activeSubnetData.sub, activeSubnetData.navEl);
+        //}
+
         function setSort(mode) {
             currentSortMode = mode;
-            document.getElementById('sort-name').className = mode === 'name' ? 'px-3 py-1 rounded-full bg-blue-600 text-white text-[9px] font-bold uppercase tracking-wider' : 'px-3 py-1 rounded-full bg-slate-200 text-slate-600 text-[9px] font-bold uppercase tracking-wider';
-            document.getElementById('sort-ip').className = mode === 'ip' ? 'px-3 py-1 rounded-full bg-blue-600 text-white text-[9px] font-bold uppercase tracking-wider' : 'px-3 py-1 rounded-full bg-slate-200 text-slate-600 text-[9px] font-bold uppercase tracking-wider';
+            const activeClass = 'px-3 py-1 rounded-full bg-blue-600 text-white text-[9px] font-bold uppercase tracking-wider';
+            const inactiveClass = 'px-3 py-1 rounded-full bg-slate-200 text-slate-600 text-[9px] font-bold uppercase tracking-wider';
+            
+            document.getElementById('sort-name').className = mode === 'name' ? activeClass : inactiveClass;
+            document.getElementById('sort-ip').className = mode === 'ip' ? activeClass : inactiveClass;
+            document.getElementById('sort-status').className = mode === 'status' ? activeClass : inactiveClass;
+            
             if (activeSubnetData) loadSubnet(activeSubnetData.sub, activeSubnetData.navEl);
         }
+
 
         async function loadSubnet(sub, navEl) {
             activeSubnetData = { sub, navEl };
@@ -447,6 +480,10 @@
             const res = await fetch('/api/data');
             const data = await res.json();
             const grid = document.getElementById('tile-grid');
+
+            const detailsSection = document.getElementById('details-section');
+            if (detailsSection) detailsSection.classList.remove('hidden');
+
             grid.innerHTML = '';
             
             const startLimit = parseInt(sub.range.split(' - ')[0].split('.').pop());
@@ -455,8 +492,28 @@
             let filtered = data.hosts.filter(h => h.ip && h.ip.startsWith(sub.prefix) && 
                 (parseInt(h.ip.split('.').pop()) >= startLimit && parseInt(h.ip.split('.').pop()) <= endLimit));
 
+            //filtered.sort((a, b) => {
+            //    if (currentSortMode === 'ip') {
+            //        const ipToNum = ip => ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet, 10), 0) >>> 0;
+            //        return ipToNum(a.ip) - ipToNum(b.ip);
+            //   } else {
+            //        const nameA = (a.name || a.hostname || "").toLowerCase();
+            //        const nameB = (b.name || b.hostname || "").toLowerCase();
+            //        return nameA.localeCompare(nameB);
+            //    }
+            //});
+
             filtered.sort((a, b) => {
-                if (currentSortMode === 'ip') {
+                if (currentSortMode === 'status') {
+                    // Sort online hosts to the top
+                    const statusA = a.status === 'online' ? 0 : 1;
+                    const statusB = b.status === 'online' ? 0 : 1;
+                    if (statusA !== statusB) return statusA - statusB;
+                    // If same status, fallback to alphabetical
+                    const nameA = (a.name || a.hostname || "").toLowerCase();
+                    const nameB = (b.name || b.hostname || "").toLowerCase();
+                    return nameA.localeCompare(nameB);
+                } else if (currentSortMode === 'ip') {
                     const ipToNum = ip => ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet, 10), 0) >>> 0;
                     return ipToNum(a.ip) - ipToNum(b.ip);
                 } else {
@@ -569,28 +626,72 @@
         }
 
         const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-        const logSocket = new WebSocket(wsProtocol + window.location.host + "/ws/logs");
-        logSocket.onmessage = (e) => {
-            const container = document.getElementById('log-content');
-            const win = document.getElementById('log-window');
-            const line = document.createElement('div');
-            line.className = "log-line py-1.5 px-2 font-mono";
-            let rawText = e.data;
-            let formattedText = rawText;
-            if (rawText.includes('DHCPREQUEST') || rawText.includes('DHCPACK')) { formattedText = `<span class="text-sky-300 font-bold">${rawText}</span>`; }
-            else if (rawText.includes('DHCPDISCOVER')) { formattedText = `<span class="text-orange-300 font-bold">${rawText}</span>`; }
-            else if (rawText.includes('DHCPINFORM')) { formattedText = `<span class="text-purple-300 font-bold">${rawText}</span>`; }
-            else if (rawText.includes('DHCPRELEASE')) { formattedText = `<span class="text-red-400 font-bold">${rawText}</span>`; }
-            line.innerHTML = `<span class="opacity-30 mr-2">$</span>` + formattedText;
-            const f = document.getElementById('log-filter').value.toLowerCase();
-            if (f && !rawText.toLowerCase().includes(f)) { line.style.display = 'none'; }
-            container.appendChild(line);
-            if (line.style.display !== 'none') { win.scrollTop = win.scrollHeight; }
-        };
 
         function clearLogs() { document.getElementById('log-content').innerHTML = ''; }
         function adjustLogFont(d) { currentFontSize += d; document.getElementById('log-window').style.fontSize = currentFontSize + 'px'; }
+
+
+// Ensure this is at the top of your script block
+let currentLogSocket = null;
+
+function switchLogStream(type, el) {
+    // 1. UI Setup
+    switchTab('logs', el);
+    const title = type === 'logs' ? 'LIVE ACTIVITY: dhcpd.log' : 'LIVE ACTIVITY: dhcpd.leases';
+    document.getElementById('view-title').innerText = title;
+
+    // 2. Clear the window
+    clearLogs();
+
+    // 3. Kill old socket
+    if (currentLogSocket) {
+        currentLogSocket.onmessage = null;
+        currentLogSocket.close();
+        currentLogSocket = null;
+    }
+
+    // 4. Start Connection
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const endpoint = (type === 'logs') ? "/ws/logs" : "/ws/leases";
+    const wsUrl = `${protocol}//${window.location.host}${endpoint}`;
+
+    currentLogSocket = new WebSocket(wsUrl);
+
+    currentLogSocket.onmessage = (e) => {
+        const container = document.getElementById('log-content');
+        const win = document.getElementById('log-window');
+        const line = document.createElement('div');
         
+        // Removed 'text-xs' so + and - buttons work again
+        line.className = "log-line py-1.5 px-2 font-mono border-b border-white/5";
+        
+        let rawText = e.data;
+        let formattedText = rawText;
+
+        if (type === 'logs') {
+            if (rawText.includes('DHCPACK') || rawText.includes('DHCPREQUEST')) {
+                formattedText = `<span class="text-sky-300 font-bold">${rawText}</span>`;
+            } else if (rawText.includes('DHCPDISCOVER')) {
+                formattedText = `<span class="text-orange-300 font-bold">${rawText}</span>`;
+            } else {
+                formattedText = `<span class="text-slate-300">${rawText}</span>`;
+            }
+        } else {
+            // Emerald Green for Leases
+            formattedText = `<span class="text-emerald-400">${rawText}</span>`;
+        }
+
+        // Changed prefix back to $
+        line.innerHTML = `<span class="opacity-30 mr-2">$</span>` + formattedText;
+        
+        container.appendChild(line);
+        
+        // Ensure new line respects current font size setting
+        line.style.fontSize = logFontSize + 'px';
+        
+        win.scrollTop = win.scrollHeight;
+    };
+}       
         async function controlService(a) { 
             await fetch(`/api/service/${a}`, { method: 'POST' });
             updateServiceStatus(); // Immediate UI feedback
@@ -616,12 +717,17 @@
             } catch (error) { showToast("Network error: Server unreachable", false); }
         }
 
-        window.onload = () => {
-            if (localStorage.getItem('dhcp_auth') === 'true') {
-                document.getElementById('login-overlay').classList.add('hidden');
-                init();
-            }
-        };
+window.onload = () => {
+    if (localStorage.getItem('dhcp_auth') === 'true') {
+        document.getElementById('login-overlay').classList.add('hidden');
+        init();
+        const defaultBtn = document.getElementById('default-nav');
+        if (defaultBtn) switchLogStream('logs', defaultBtn);
+
+        // Start with the default log stream
+        //switchLogStream('logs', document.getElementById('default-nav'));
+    }
+};
 
     </script>
 </body>
