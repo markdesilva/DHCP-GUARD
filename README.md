@@ -1,3 +1,9 @@
+# UPDATES (27th March 2026)
++ Added remaining lease time to tiles for leased clients
+
+<img width="603" height="169" alt="dg-lease_left" src="https://github.com/user-attachments/assets/96c89d8a-527f-4f90-8efc-95517b0c0171" />
+
+
 # UPDATES (26th March 2026)
 + Added live stream for /var/lib/dhcp/dhcpd.leases under 'Live Activity' (new side panel entries)
 
