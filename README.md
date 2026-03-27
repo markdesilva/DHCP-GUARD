@@ -33,9 +33,9 @@ Vibe coded (and heavly human edited) Web-Based Management for ISC-DHCP-Server fo
 ## History
 ISC has moved to KEA DHCP and has their own UI, but didn't really meet what I needed and I still had multiple installations running off isc-dhcp-server. [Akkadius/glass-isc-dhcp](https://github.com/Akkadius/glass-isc-dhcp) while rich in features, didn't manage fixed IP reservations. We make users register their machines for DHCP, so fixed IP client reservations were a must and hence I decided to make use of AI to vibe code a simple UI for what I needed. 
 
-Despite having plenty of ideas, trying to get the AI to remember what it did right previously and not mess it up was unbelievably painful! In anycase, after 4 days of battling Gemini and constantly remininding it what code worked and what didn't and arguing with it on its logic and it refusing to accept my code as correct, we finally managed to get this out.
+Despite having plenty of ideas, trying to get the AI to remember what it did right previously and not mess it up was unbelievably painful! In anycase, after 4 days of battling Gemini and constantly remininding it what code worked and what didn't and arguing with it on its logic of simplifying everything and wiping out entire blocks of working code and it refusing to accept my versions of code as correct, we finally managed to get this out.
 
-I call it v1.10 but its more like 1.1000 after all the back and forth.
+I call this initial version v1.10 but its more like 1.1000 after all the back and forth.
 
 ## Description
 DHCP Guard is a modern, lightweight FastAPI application designed to provide a real-time dashboard and management interface for the Linux isc-dhcp-server for leased and fixed IP client reservations. 
