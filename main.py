@@ -149,17 +149,75 @@ def parse_dhcp_configs(main_path):
     return hosts
 
 def get_live_leases():
-    leases = []
-    if not os.path.exists(LEASES_FILE): return leases
+    active_by_mac = {}
+    if not os.path.exists(LEASES_FILE): return []
     try:
         with open(LEASES_FILE, "r") as f:
             blocks = re.findall(r"lease (\d+\.\d+\.\d+\.\d+) \{(.*?)\}", f.read(), re.DOTALL)
             for ip, details in blocks:
+                state_m = re.search(r"binding state (.*?);", details)
                 mac_m = re.search(r"hardware ethernet ([:a-f0-9]+);", details)
                 host_m = re.search(r'client-hostname "(.*?)";', details)
-                leases.append({"ip": ip, "mac": mac_m.group(1).lower() if mac_m else "unknown", "hostname": host_m.group(1) if host_m else "Dynamic Device"})
+                ends_m = re.search(r"ends \d+ (\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2});", details)
+                
+                # Only process blocks that have a MAC and are actively bound
+                if mac_m and state_m and state_m.group(1) == "active":
+                    mac = mac_m.group(1).lower()
+                    
+                    # By assigning to a dictionary by MAC, older duplicate blocks 
+                    # are safely overwritten by the newest lease block at the bottom of the file
+                    active_by_mac[mac] = {
+                        "ip": ip, 
+                        "mac": mac, 
+                        "hostname": host_m.group(1) if host_m else "Dynamic Device",
+                        "ends": ends_m.group(1) if ends_m else None
+                    }
     except: pass
-    return leases
+    
+    return list(active_by_mac.values())
+
+
+def get_active_leases(filepath):
+    """Parses the dhcpd.leases file and returns active leases, deduplicated by MAC."""
+    active_by_mac = {}
+    current_ip = None
+    current_lease = {}
+
+    try:
+        with open(filepath, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("lease "):
+                    # .split() without arguments handles tabs and multiple spaces automatically
+                    current_ip = line.split()[1]
+                    current_lease = {
+                        "ip": current_ip, 
+                        "state": "unknown", 
+                        "mac": "", 
+                        "hostname": "Unknown Device", 
+                        "ends": None
+                    }
+                elif line.startswith("binding state "):
+                    current_lease["state"] = line.split()[2].strip(";")
+                elif line.startswith("hardware ethernet "):
+                    current_lease["mac"] = line.split()[2].strip(";")
+                elif line.startswith("client-hostname "):
+                    parts = line.split(maxsplit=1)
+                    if len(parts) > 1:
+                        current_lease["hostname"] = parts[1].strip('";')
+                elif line.startswith("ends "): 
+                    parts = line.split()
+                    # parts will cleanly be: ['ends', '4', '2026/03/26', '23:10:15;']
+                    if len(parts) >= 4:
+                        current_lease["ends"] = f"{parts[2]} {parts[3].strip(';')}"
+                elif line == "}":
+                    if current_ip and current_lease.get("mac"):
+                        active_by_mac[current_lease["mac"]] = current_lease.copy()
+                        current_ip = None
+    except FileNotFoundError:
+        pass
+
+    return [lease for lease in active_by_mac.values() if lease["state"] == "active"]
 
 # --- AUTHENTICATION ROUTES ---
 @app.post("/api/login")
@@ -343,35 +401,109 @@ async def delete_host(hostname: str):
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     try:
-        with open(LOG_FILE, "r", 1) as f:
-            f.seek(0, os.SEEK_END)
-            while True:
-                line = f.readline()
-                if line: await websocket.send_text(line)
-                else: await asyncio.sleep(0.5)
-    except: pass
+        while True:
+            try:
+                # Get the current file's unique ID (inode)
+                current_ino = os.stat(LOG_FILE).st_ino
+                with open(LOG_FILE, "r") as f:
+                    f.seek(0, os.SEEK_END)
+                    while True:
+                        line = f.readline()
+                        if line: 
+                            await websocket.send_text(line)
+                        else: 
+                            await asyncio.sleep(0.5)
+                            # Check if syslog rotated the file behind our back
+                            if os.stat(LOG_FILE).st_ino != current_ino:
+                                break # Break inner loop to reopen the new file
+            except FileNotFoundError:
+                await asyncio.sleep(0.5) # File is mid-rotation, wait half a sec
+    except Exception:
+        pass
 
-# --- ADD THIS TO THE WEBSOCKET SECTION ---
 @app.websocket("/ws/leases")
 async def websocket_leases_endpoint(websocket: WebSocket):
     await websocket.accept()
     try:
-        # Streams the raw leases file content as it updates
-        with open(LEASES_FILE, "r", 1) as f:
-            # Send current content first so the window isn't empty
-            content = f.read()
-            if content:
-                await websocket.send_text(content)
+        # Initial load: Send current content so the window isn't empty
+        try:
+            with open(LEASES_FILE, "r") as f:
+                content = f.read()
+                if content:
+                    await websocket.send_text(content)
+        except FileNotFoundError:
+            pass 
 
-            f.seek(0, os.SEEK_END)
-            while True:
-                line = f.readline()
-                if line: 
-                    await websocket.send_text(line)
-                else: 
-                    await asyncio.sleep(1) # Leases update less frequently than logs
+        while True:
+            try:
+                # Track the starting inode
+                current_ino = os.stat(LEASES_FILE).st_ino
+                
+                with open(LEASES_FILE, "r") as f:
+                    f.seek(0, os.SEEK_END)
+                    while True:
+                        line = f.readline()
+                        if line: 
+                            await websocket.send_text(line)
+                        else: 
+                            await asyncio.sleep(1)
+                            
+                            # Grab fresh file stats
+                            current_stats = os.stat(LEASES_FILE)
+                            
+                            # TRIGGER REFRESH IF:
+                            # 1. Inode changed (DHCP daemon swapped the file)
+                            # 2. File size is smaller than our cursor (Human truncated/copied over it)
+                            if current_stats.st_ino != current_ino or current_stats.st_size < f.tell():
+                                
+                                # Clear the screen
+                                await websocket.send_text("__CLEAR_STREAM__")
+                                
+                                # Instantly dump the new file
+                                with open(LEASES_FILE, "r") as new_f:
+                                    new_content = new_f.read()
+                                    if new_content:
+                                        await websocket.send_text(new_content)
+                                        
+                                # Break inner loop to update the tracked inode and reset the cursor
+                                break 
+            except FileNotFoundError:
+                await asyncio.sleep(1)
     except Exception as e:
         print(f"Lease WS Error: {e}")
+
+@app.websocket("/ws/active-tiles")
+async def websocket_tiles_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        # 1. Instantly parse and send the active leases on connection
+        await websocket.send_json(get_active_leases(LEASES_FILE))
+        
+        # Track initial file state
+        try:
+            current_ino = os.stat(LEASES_FILE).st_ino
+            current_size = os.stat(LEASES_FILE).st_size
+        except FileNotFoundError:
+            current_ino, current_size = 0, 0
+
+        # 2. Watch for file changes
+        while True:
+            await asyncio.sleep(1) 
+            try:
+                stats = os.stat(LEASES_FILE)
+                # If daemon swapped file (inode changed) or appended new leases (size changed)
+                if stats.st_ino != current_ino or stats.st_size != current_size:
+                    
+                    # Send fresh JSON
+                    await websocket.send_json(get_active_leases(LEASES_FILE))
+                    
+                    # Update trackers
+                    current_ino = stats.st_ino
+                    current_size = stats.st_size
+            except FileNotFoundError:
+                pass
+    except Exception as e:
+        print(f"Tiles WS Error: {e}")
 
 app.mount("/", StaticFiles(directory="/opt/dhcp-guard", html=True), name="static")
 

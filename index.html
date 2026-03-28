@@ -116,7 +116,7 @@
 
         <div class="p-5 border-t border-slate-800 bg-slate-950/50">
             <div class="text-[11px] font-black text-slate-200 uppercase tracking-wider leading-none">Written by Google Gemini</div>
-            <div class="text-[9px] text-slate-500 font-medium mt-1">Designed and modified by Mark De Silva</div>
+            <div class="text-[9px] text-slate-500 font-medium mt-1">Designed and edited by Mark De Silva</div>
         </div>
     </aside>
 
@@ -270,6 +270,9 @@
         let allKnownHosts = [];
         let currentSortMode = 'name';
         let activeSubnetData = null;
+        let currentLogSocket = null;
+        let tilesSocket = null;
+
 
         async function handleLogin(e) {
             e.preventDefault();
@@ -288,7 +291,8 @@
                     document.getElementById('login-overlay').classList.add('hidden');
                     document.getElementById('l-pass').value = ''; 
                     showToast("Access Granted");
-                    init(); 
+                    await init(); 
+                    //initActiveTilesStream();
                     const defaultBtn = document.getElementById('default-nav');
                     if (defaultBtn) switchLogStream('logs', defaultBtn);
                 } else {
@@ -454,12 +458,6 @@
             } else { badge.className = "absolute right-3 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-slate-200"; }
         });
 
-        //function setSort(mode) {
-        //    currentSortMode = mode;
-        //    document.getElementById('sort-name').className = mode === 'name' ? 'px-3 py-1 rounded-full bg-blue-600 text-white text-[9px] font-bold uppercase tracking-wider' : 'px-3 py-1 rounded-full bg-slate-200 text-slate-600 text-[9px] font-bold uppercase tracking-wider';
-        //    document.getElementById('sort-ip').className = mode === 'ip' ? 'px-3 py-1 rounded-full bg-blue-600 text-white text-[9px] font-bold uppercase tracking-wider' : 'px-3 py-1 rounded-full bg-slate-200 text-slate-600 text-[9px] font-bold uppercase tracking-wider';
-        //    if (activeSubnetData) loadSubnet(activeSubnetData.sub, activeSubnetData.navEl);
-        //}
 
         function setSort(mode) {
             currentSortMode = mode;
@@ -474,80 +472,79 @@
         }
 
 
-        async function loadSubnet(sub, navEl) {
-            activeSubnetData = { sub, navEl };
-            switchTab('tiles', navEl);
-            const res = await fetch('/api/data');
-            const data = await res.json();
-            const grid = document.getElementById('tile-grid');
+async function loadSubnet(sub, navEl) {
+    const grid = document.getElementById('tile-grid');
+    if (grid) grid.innerHTML = '';
 
-            const detailsSection = document.getElementById('details-section');
-            if (detailsSection) detailsSection.classList.remove('hidden');
+    activeSubnetData = { sub, navEl };
+    switchTab('tiles', navEl);
+    
+    const res = await fetch('/api/data');
+    const data = await res.json();
 
-            grid.innerHTML = '';
-            
-            const startLimit = parseInt(sub.range.split(' - ')[0].split('.').pop());
-            const endLimit = parseInt(sub.range.split(' - ')[1].split('.').pop());
-            
-            let filtered = data.hosts.filter(h => h.ip && h.ip.startsWith(sub.prefix) && 
-                (parseInt(h.ip.split('.').pop()) >= startLimit && parseInt(h.ip.split('.').pop()) <= endLimit));
+    const detailsSection = document.getElementById('details-section');
+    
+    if (detailsSection) detailsSection.classList.remove('hidden');
+    grid.innerHTML = '';
 
-            //filtered.sort((a, b) => {
-            //    if (currentSortMode === 'ip') {
-            //        const ipToNum = ip => ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet, 10), 0) >>> 0;
-            //        return ipToNum(a.ip) - ipToNum(b.ip);
-            //   } else {
-            //        const nameA = (a.name || a.hostname || "").toLowerCase();
-            //        const nameB = (b.name || b.hostname || "").toLowerCase();
-            //        return nameA.localeCompare(nameB);
-            //    }
-            //});
+    const startLimit = parseInt(sub.range.split(' - ')[0].split('.').pop());
+    const endLimit = parseInt(sub.range.split(' - ')[1].split('.').pop());
 
-            filtered.sort((a, b) => {
-                if (currentSortMode === 'status') {
-                    // Sort online hosts to the top
-                    const statusA = a.status === 'online' ? 0 : 1;
-                    const statusB = b.status === 'online' ? 0 : 1;
-                    if (statusA !== statusB) return statusA - statusB;
-                    // If same status, fallback to alphabetical
-                    const nameA = (a.name || a.hostname || "").toLowerCase();
-                    const nameB = (b.name || b.hostname || "").toLowerCase();
-                    return nameA.localeCompare(nameB);
-                } else if (currentSortMode === 'ip') {
-                    const ipToNum = ip => ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet, 10), 0) >>> 0;
-                    return ipToNum(a.ip) - ipToNum(b.ip);
-                } else {
-                    const nameA = (a.name || a.hostname || "").toLowerCase();
-                    const nameB = (b.name || b.hostname || "").toLowerCase();
-                    return nameA.localeCompare(nameB);
-                }
-            });
+    let filtered = data.hosts.filter(h => h.ip && h.ip.startsWith(sub.prefix) &&
+        (parseInt(h.ip.split('.').pop()) >= startLimit && parseInt(h.ip.split('.').pop()) <= endLimit));
 
-            filtered.forEach((item, index) => {
-                const color = item.status === 'online' ? 'bg-emerald-500' : 'bg-red-500';
-                const div = document.createElement('div');
-                div.className = "device-tile bg-white p-4 rounded-2xl border border-slate-200 shadow-sm cursor-pointer hover:border-blue-400 hover:shadow-md";
-                div.onclick = () => updateHeroChart(item.ip, div);
-                div.innerHTML = `
-                    <div class="flex justify-between items-start mb-3">
-                        <div class="text-[8px] font-black uppercase px-2 py-0.5 rounded shadow-sm ${item.source ? 'bg-blue-600 text-white' : 'bg-emerald-500 text-white'}">${item.source ? 'Static' : 'Lease'}</div>
-                        <div class="h-2.5 w-2.5 ${color} rounded-full shadow-sm"></div>
-                    </div>
-                    <h3 class="font-extrabold text-slate-800 truncate text-[11px] mb-0.5">${item.name || item.hostname}</h3>
-                    <div class="text-lg font-black text-slate-900 tracking-tighter leading-none">${item.ip}</div>
-                    <p class="text-[9px] text-slate-400 mono mt-2 opacity-70 tracking-tighter">${item.mac.toUpperCase()}</p>
-                    <div class="details-footer group/footer" onclick="event.stopPropagation(); openDetails('${item.mac}', '${item.name || item.hostname}')">
-                        <div class="flex items-center justify-between opacity-30 hover:opacity-100 transition-opacity">
-                            <span class="text-[8px] font-black uppercase tracking-tighter">Details</span>
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-width="2.5"/></svg>
-                        </div>
-                        <div id="hover-${item.mac.replace(/:/g,'')}" class="details-tooltip group-hover/footer:visible">Loading...</div>
-                    </div>`;
-                grid.appendChild(div);
-                fetchDetailsForHover(item.mac);
-                if(index === 0) updateHeroChart(item.ip, div);
-            });
+    filtered.sort((a, b) => {
+        if (currentSortMode === 'status') {
+            const statusA = a.status === 'online' ? 0 : 1;
+            const statusB = b.status === 'online' ? 0 : 1;
+            if (statusA !== statusB) return statusA - statusB;
+            const nameA = (a.name || a.hostname || "").toLowerCase();
+            const nameB = (b.name || b.hostname || "").toLowerCase();
+            return nameA.localeCompare(nameB);
+        } else if (currentSortMode === 'ip') {
+            const ipToNum = ip => ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet, 10), 0) >>> 0;
+            return ipToNum(a.ip) - ipToNum(b.ip);
+        } else {
+            const nameA = (a.name || a.hostname || "").toLowerCase();
+            const nameB = (b.name || b.hostname || "").toLowerCase();
+            return nameA.localeCompare(nameB);
         }
+    });
+
+    filtered.forEach((item, index) => {
+        const color = item.status === 'online' ? 'bg-emerald-500' : 'bg-red-500';
+        const div = document.createElement('div');
+        div.className = "device-tile bg-white p-4 rounded-2xl border border-slate-200 shadow-sm cursor-pointer hover:border-blue-400 hover:shadow-md transition-all";
+        div.onclick = () => updateHeroChart(item.ip, div);
+        
+        div.innerHTML = `
+            <div class="flex justify-between items-start mb-3">
+                <div class="text-[8px] font-black uppercase px-2 py-0.5 rounded shadow-sm ${item.source ? 'bg-blue-600 text-white' : 'bg-emerald-500 text-white'}">
+                    ${item.source ? 'Static' : 'DHCP'}
+                </div>
+                <div class="h-2.5 w-2.5 ${color} rounded-full shadow-sm"></div>
+            </div>
+            <h3 class="font-extrabold text-slate-800 truncate text-[11px] mb-0.5">${item.name || item.hostname || 'Unknown Device'}</h3>
+            <div class="text-lg font-black text-slate-900 tracking-tighter leading-none flex items-baseline gap-2">
+                ${item.ip}
+                ${!item.source ? `<span class="lease-countdown text-[11px] text-slate-400 font-bold tracking-normal" data-ends="${item.ends}"></span>` : ''}
+            </div>
+            <p class="text-[9px] text-slate-400 mono mt-2 opacity-70 tracking-tighter">${item.mac.toUpperCase()}</p>
+            <div class="details-footer group/footer" onclick="event.stopPropagation(); openDetails('${item.mac}', '${item.name || item.hostname}')">
+                <div class="flex items-center justify-between opacity-30 hover:opacity-100 transition-opacity">
+                    <span class="text-[8px] font-black uppercase tracking-tighter">Details</span>
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+                <div id="hover-${item.mac.replace(/:/g,'')}" class="details-tooltip group-hover/footer:visible">Loading...</div>
+            </div>`;
+        grid.appendChild(div);
+        fetchDetailsForHover(item.mac);
+        if(index === 0) updateHeroChart(item.ip, div);
+    });
+
+    if (typeof updateLeaseCountdowns === "function") updateLeaseCountdowns();
+}
+
 
         async function fetchDetailsForHover(mac) {
             const res = await fetch(`/api/get-details/${mac}`);
@@ -631,8 +628,6 @@
         function adjustLogFont(d) { currentFontSize += d; document.getElementById('log-window').style.fontSize = currentFontSize + 'px'; }
 
 
-// Ensure this is at the top of your script block
-let currentLogSocket = null;
 
 function switchLogStream(type, el) {
     // 1. UI Setup
@@ -657,10 +652,16 @@ function switchLogStream(type, el) {
 
     currentLogSocket = new WebSocket(wsUrl);
 
-    currentLogSocket.onmessage = (e) => {
+currentLogSocket.onmessage = (e) => {
         const container = document.getElementById('log-content');
         const win = document.getElementById('log-window');
         
+        // --- NEW: Listen for the clear signal from the backend ---
+        if (e.data === '__CLEAR_STREAM__') {
+            container.innerHTML = '';
+            return; // Stop processing this specific message
+        }
+
         // 1. Split the incoming payload into an array of lines
         let rawLines = e.data.split('\n');
         
@@ -672,8 +673,6 @@ function switchLogStream(type, el) {
         // 3. Process each line individually
         rawLines.forEach(rawText => {
             const line = document.createElement('div');
-            
-            // Added 'whitespace-pre-wrap' to natively preserve spaces and line breaks
             line.className = "log-line py-1.5 px-2 font-mono border-b border-white/5 whitespace-pre-wrap";
             
             let formattedText = rawText;
@@ -687,22 +686,16 @@ function switchLogStream(type, el) {
                     formattedText = `<span class="text-slate-300">${rawText}</span>`;
                 }
             } else {
-                // Emerald Green for Leases
                 formattedText = `<span class="text-emerald-400">${rawText}</span>`;
             }
 
             line.innerHTML = `<span class="opacity-30 mr-2">$</span>` + formattedText;
             container.appendChild(line);
             
-            // Respect current font size
-            if (typeof currentFontSize !== 'undefined') {
-                line.style.fontSize = currentFontSize + 'px';
-            }
         });
         
         win.scrollTop = win.scrollHeight;
     };
-
 }       
         async function controlService(a) { 
             await fetch(`/api/service/${a}`, { method: 'POST' });
@@ -729,10 +722,151 @@ function switchLogStream(type, el) {
             } catch (error) { showToast("Network error: Server unreachable", false); }
         }
 
-window.onload = () => {
+function initActiveTilesStream() {
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${wsProtocol}//${window.location.host}/ws/active-tiles`;
+    
+    if (tilesSocket && tilesSocket.readyState !== WebSocket.CLOSED) {
+        tilesSocket.close();
+    }
+
+    tilesSocket = new WebSocket(wsUrl);
+
+tilesSocket.onmessage = function(event) {
+        if (activeSubnetData && activeSubnetData.sub) {
+            return; 
+        }
+
+        const container = document.getElementById('tile-grid');
+        if (!container) return;
+
+        container.innerHTML = '';
+        const devices = JSON.parse(event.data);
+
+        const filterText = (document.getElementById('log-filter').value || "").toLowerCase();
+        
+        const filtered = devices.filter(d => 
+            (d.ip && d.ip.toLowerCase().includes(filterText)) || 
+            (d.hostname && d.hostname.toLowerCase().includes(filterText)) ||
+            (d.mac && d.mac.toLowerCase().includes(filterText))
+        );
+
+        filtered.sort((a, b) => {
+            if (currentSortMode === 'status') {
+                const statusA = a.status === 'online' ? 0 : 1;
+                const statusB = b.status === 'online' ? 0 : 1;
+                if (statusA !== statusB) return statusA - statusB;
+                const nameA = (a.name || a.hostname || "").toLowerCase();
+                const nameB = (b.name || b.hostname || "").toLowerCase();
+                return nameA.localeCompare(nameB);
+            } else if (currentSortMode === 'ip') {
+                const ipToNum = ip => ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet, 10), 0) >>> 0;
+                return ipToNum(a.ip) - ipToNum(b.ip);
+            } else {
+                const nameA = (a.name || a.hostname || "").toLowerCase();
+                const nameB = (b.name || b.hostname || "").toLowerCase();
+                return nameA.localeCompare(nameB);
+            }
+        });
+
+        container.innerHTML = '';
+        filtered.forEach((device) => {
+            const tile = document.createElement('div');
+            tile.className = "device-tile bg-white border border-slate-200 p-4 rounded-2xl shadow-sm hover:shadow-md cursor-pointer flex flex-col gap-1 relative overflow-hidden group";
+            
+            // Added 'flex items-baseline gap-2' and the lease-countdown span:
+            tile.innerHTML = `
+                <div class="flex justify-between items-start mb-2 z-10 relative">
+                    <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">DHCP</div>
+                    <div class="w-2 h-2 rounded-full ${device.status === 'online' ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse' : 'bg-slate-300'}"></div>
+                </div>
+                <div class="text-blue-600 font-black text-lg mt-1 z-10 relative flex items-baseline gap-2">
+                    ${device.ip}
+                    ${device.ends ? `<span class="lease-countdown" data-ends="${device.ends}"></span>` : ''}
+                </div>
+                <div class="text-slate-700 font-black truncate z-10 relative">${device.hostname || 'no-hostname'}</div>
+                <div class="text-slate-400 text-[10px] font-bold font-mono z-10 relative">${device.mac.toUpperCase()}</div>
+            `;
+            
+            tile.onclick = () => updateHeroChart(device.ip, tile);
+            container.appendChild(tile);
+        });
+
+        // TRIGGER THE MATH: Run the countdown math immediately after the loop finishes drawing
+        if (typeof updateLeaseCountdowns === "function") {
+            updateLeaseCountdowns();
+        }
+    };
+
+    tilesSocket.onerror = function(error) {
+        console.error("Tiles WebSocket Error:", error);
+    };
+}
+
+// Global Lease Countdown Updater
+// DIAGNOSTIC VERSION: Global Lease Countdown Updater
+function updateLeaseCountdowns() {
+    const elements = document.querySelectorAll('.lease-countdown');
+    console.log(`[DHCP Diagnostic] Found ${elements.length} lease tiles on screen.`);
+    
+    elements.forEach(el => {
+        const endsUTC = el.getAttribute('data-ends');
+        const ipText = el.parentElement.innerText.split('\n')[0].trim(); 
+        
+        console.log(`[DHCP Diagnostic] Tile IP: ${ipText} | Raw data-ends from backend:`, endsUTC);
+        
+        if (!endsUTC || endsUTC === "null" || endsUTC === "undefined") {
+            el.innerText = "(No End Time)";
+            el.className = "lease-countdown text-[11px] text-red-500 font-bold tracking-normal ml-2";
+            return;
+        }
+        
+        // Format to ISO 8601 string in UTC
+        const isoString = endsUTC.replace(/\//g, '-').replace(' ', 'T') + 'Z';
+        const endsDate = new Date(isoString);
+        const diffMs = endsDate - new Date(); // Compare to current time
+        
+        console.log(`[DHCP Diagnostic] Tile IP: ${ipText} | Parsed Date: ${endsDate} | Difference (ms): ${diffMs}`);
+
+        if (isNaN(diffMs)) {
+            el.innerText = "(Parse Error)";
+            el.className = "lease-countdown text-[11px] text-red-500 font-bold tracking-normal ml-2";
+            return; 
+        }
+
+        if (diffMs > 0) {
+            const diffMins = Math.floor(diffMs / 60000);
+            if (diffMins > 1440) {
+                el.innerText = `(${Math.floor(diffMins / 1440)}d left)`;
+            } else if (diffMins > 60) {
+                el.innerText = `(${Math.floor(diffMins / 60)}h ${diffMins % 60}m left)`;
+            } else {
+                el.innerText = `(${diffMins}m left)`;
+            }
+            // Bright green so you can't miss it
+            el.className = "lease-countdown text-[11px] text-emerald-500 font-black tracking-normal ml-2";
+        } else {
+            el.innerText = `(Expired)`;
+            // Bright orange if the time is in the past
+            el.className = "lease-countdown text-[11px] text-orange-500 font-bold tracking-normal ml-2";
+        }
+    });
+}
+
+
+
+// Run immediately on page load/render, then loop every 10 seconds
+updateLeaseCountdowns();
+setInterval(updateLeaseCountdowns, 10000);
+
+// IMPORTANT: We also need to run this function immediately whenever the WebSocket draws new tiles!
+// We will trigger it dynamically below.
+
+window.onload = async () => {
     if (localStorage.getItem('dhcp_auth') === 'true') {
         document.getElementById('login-overlay').classList.add('hidden');
-        init();
+        await init();
+        //initActiveTilesStream();
         const defaultBtn = document.getElementById('default-nav');
         if (defaultBtn) switchLogStream('logs', defaultBtn);
 
