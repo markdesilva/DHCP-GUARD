@@ -137,6 +137,11 @@ systemctl restart apache2
         ProxyPassReverse ws://127.0.0.1:8000/ws/leases
     </Location>
 
+    <Location /ws/active-tiles>
+        ProxyPass ws://127.0.0.1:8000/ws/active-tiles
+        ProxyPassReverse ws://127.0.0.1:8000/ws/active-tiles
+    </Location>
+
     ProxyPass /api http://127.0.0.1:8000/api
     ProxyPassReverse /api http://127.0.0.1:8000/api
 
@@ -191,6 +196,14 @@ server {
         proxy_read_timeout 86400;
     }
 
+    location /ws/active-tiles {
+        proxy_pass http://127.0.0.1:8000/ws/active-tiles;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 86400;
+    }
+
     location /api/ {
         proxy_pass http://127.0.0.1:8000/api/;
     }
@@ -231,7 +244,7 @@ systemctl start dhcp-guard
 ```
 
 ### DHCP Config
-We assume the DHCP config in /etc/dhcp/dhcpd.conf is structured reasonably similar to this
++ We assume the DHCP config in /etc/dhcp/dhcpd.conf is structured reasonably similar to this
 ```
 server-identifier <IP>;
 option domain-name "<domain being served>";
@@ -278,7 +291,7 @@ include "</include path/config N>";
 
 ```
 
-And your include files for fixed IPs structured reasonably similar to this
++ And your include files for fixed IPs structured reasonably similar to this
 ```
 host <host 1> {
 hardware ethernet <MAC of host 1>;
@@ -298,6 +311,8 @@ fixed-address <Fixed IP of host N>;
 }
 ```
 
++ Note: Dchp-guard will only pick up *.conf files in the includes for its 'Add Host' section to add static leases into. You can have other includes with files without the .conf extension for other purposes (eg: .class, .deny, etc)
+
 ### Running DHCP-GUARD
 + If you have created DHCP-GUARD as a service just do
 ```
@@ -311,8 +326,18 @@ systemctl stop dhcp-guard
 ```
 systemctl start dhcp-guard
 ```
-
-+ Open a browser and navigate to https://your.server.fqdn (add the :port if you changed the port numbers)
++ If you want to run it from the CLI and see whats happening at the server end then do:
+```
+cd /opt/dhcp-guard
+source ./venv/bin/activate
+```
++ You will be in the python virtual environment, then do
+```
+python3 main.py
+```
++ This is especially good for testing changes you make to the code on your own
++ To exit the CLI run mode, do CTRL-C **TWICE**
++ To access the web-ui, open a browser and navigate to https://your.server.fqdn (add the :port if you changed the port numbers)
 
 
 <img width="512" height="503" alt="image" src="https://github.com/user-attachments/assets/3f6a4c0d-0eeb-4404-af36-72925f1182be" />
