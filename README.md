@@ -1,3 +1,8 @@
+# UPDATES (29th March 2026)
++ Tiles and ping graph update dynamically and seamlessly without updating or refreshing the whole page
++ If new dynamic clients get an ip, the tiles will added to the grid, for static leases, the status icon will change from red to green
++ Ping graph updates every 5 minutes, tiles check for refresh every 10 seconds
+
 # UPDATES (27th March 2026)
 + Added remaining lease time to tiles for leased clients
 
@@ -436,7 +441,7 @@ password: password
 + The ping timing db is auto generated, if you lose the db file, it will regenerate
 
 ### TO DO
-+ Make the ping graph update without refreshing the page (non priority target)
++ ~~Make the ping graph update without refreshing the page (non priority target)~~ (Done!)
 
 ### TO NEVER DO
 + Edit DHCP config options (other than hosts) directly from the UI 
