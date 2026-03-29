@@ -452,7 +452,7 @@ password: password
 
 
 ### Files 
-+ The ping user credentials, timing information and client descriptions/information are stored in SQLite databases in /opt/dhcp-guard
++ The ping history, user credentials and client descriptions/information are stored in SQLite databases in /opt/dhcp-guard
 + If you forget your password, just download the user.db file from the repo again and use the default credentials
 + If you lose the client description you will have to recreate them - best to have a cron back them up
 + The ping timing db is auto generated, if you lose the db file, it will regenerate
