@@ -459,6 +459,7 @@ password: password
 
 ### TO DO
 + ~~Make the ping graph update without refreshing the page (non priority target)~~ (Done!)
++ Move all the variables to a separate config file, so its easier to effect changes for things like config file and db paths, timing for refreshes, etc 
 
 ### TO NEVER DO
 + Edit DHCP config options (other than hosts) directly from the UI 
