@@ -102,7 +102,7 @@ async def ping_scheduler():
                     await db.execute("INSERT INTO pings VALUES (?, ?, ?)", (ip, latency, datetime.now()))
             await db.execute("DELETE FROM pings WHERE timestamp < ?", (datetime.now() - timedelta(hours=24),))
             await db.commit()
-        await asyncio.sleep(300)
+        await asyncio.sleep(60) #ping every minute
 
 # --- DHCP PARSING & VALIDATION HELPERS ---
 def get_all_config_files():
@@ -188,22 +188,24 @@ def get_live_leases():
                 host_m = re.search(r'client-hostname "(.*?)";', details)
                 ends_m = re.search(r"ends \d+ (\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2});", details)
                 
-                # Only process blocks that have a MAC and are actively bound
-                if mac_m and state_m and state_m.group(1) == "active":
+                # We now process ALL blocks with a MAC address
+                if mac_m and state_m:
                     mac = mac_m.group(1).lower()
                     
-                    # By assigning to a dictionary by MAC, older duplicate blocks 
-                    # are safely overwritten by the newest lease block at the bottom of the file
-                    active_by_mac[mac] = {
-                        "ip": ip, 
-                        "mac": mac, 
-                        "hostname": host_m.group(1) if host_m else "Dynamic Device",
-                        "ends": ends_m.group(1) if ends_m else None
-                    }
+                    if state_m.group(1) == "active":
+                        # If active, add/update the device in our list
+                        active_by_mac[mac] = {
+                            "ip": ip, 
+                            "mac": mac, 
+                            "hostname": host_m.group(1) if host_m else "Dynamic Device",
+                            "ends": ends_m.group(1) if ends_m else None
+                        }
+                    elif mac in active_by_mac:
+                        # If the newest block says free/abandoned/expired, delete it from our active list!
+                        del active_by_mac[mac]
     except: pass
     
     return list(active_by_mac.values())
-
 
 def get_active_leases(filepath):
     """Parses the dhcpd.leases file and returns active leases, deduplicated by MAC."""
@@ -370,7 +372,7 @@ async def get_data():
 @app.get("/api/ping-history/{ip}")
 async def get_ping_history(ip: str):
     async with aiosqlite.connect(DB_PATH) as db:
-        cursor = await db.execute("SELECT latency, timestamp FROM pings WHERE ip = ? AND timestamp > ? ORDER BY timestamp ASC", (ip, datetime.now() - timedelta(hours=2)))
+        cursor = await db.execute("SELECT latency, timestamp FROM pings WHERE ip = ? AND timestamp > ? ORDER BY timestamp ASC", (ip, datetime.now() - timedelta(minutes=30))) # Show 30 mins of history only
         rows = await cursor.fetchall()
         return [{"y": r[0], "x": r[1]} for r in rows]
 
@@ -475,6 +477,22 @@ async def delete_host(hostname: str):
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     try:
+        # --- Tail last 200 of the log file ---
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                'tail', '-n', '200', LOG_FILE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, _ = await proc.communicate()
+            if stdout:
+                for line in stdout.decode('utf-8').splitlines():
+                    if line.strip():
+                        await websocket.send_text(line + '\n')
+        except Exception as e:
+            print(f"History load error: {e}")
+        # --- End tail ---
+
         while True:
             try:
                 current_ino = os.stat(LOG_FILE).st_ino

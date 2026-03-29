@@ -266,7 +266,7 @@
         let activeSubnetData = null;
         let currentLogSocket = null;
         let tilesSocket = null;
-
+        let logHistoryCache = []; 
 
         async function handleLogin(e) {
             e.preventDefault();
@@ -634,14 +634,21 @@ async function loadSubnet(sub, navEl, isBackgroundRefresh = false) {
         function clearLogs() { document.getElementById('log-content').innerHTML = ''; }
         function adjustLogFont(d) { currentFontSize += d; document.getElementById('log-window').style.fontSize = currentFontSize + 'px'; }
 
-
-
 function switchLogStream(type, el) {
     switchTab('logs', el);
     const title = type === 'logs' ? 'LIVE ACTIVITY: dhcpd.log' : 'LIVE ACTIVITY: dhcpd.leases';
     document.getElementById('view-title').innerText = title;
 
-    clearLogs();
+    const container = document.getElementById('log-content');
+    const win = document.getElementById('log-window');
+
+    // --- RESTORE CACHE OR CLEAR LOGS ---
+    if (type === 'logs') {
+        container.innerHTML = logHistoryCache.join('');
+        win.scrollTop = win.scrollHeight; // Jump to bottom when opening the tab
+    } else {
+        clearLogs(); // Keep the original clear behavior for the leases tab
+    }
 
     if (currentLogSocket) {
         currentLogSocket.onmessage = null;
@@ -656,16 +663,16 @@ function switchLogStream(type, el) {
     currentLogSocket = new WebSocket(wsUrl);
 
     currentLogSocket.onmessage = (e) => {
-        const container = document.getElementById('log-content');
-        const win = document.getElementById('log-window');
-        
         if (e.data === '__CLEAR_STREAM__') {
             container.innerHTML = '';
-            return; 
+            return;
         }
 
+        // --- SMART SCROLL: Check if user is near the bottom BEFORE adding new lines ---
+        const isAtBottom = win.scrollHeight - win.scrollTop <= win.clientHeight + 50;
+
         let rawLines = e.data.split('\n');
-        
+
         if (rawLines.length > 0 && rawLines[rawLines.length - 1] === '') {
             rawLines.pop();
         }
@@ -673,7 +680,7 @@ function switchLogStream(type, el) {
         rawLines.forEach(rawText => {
             const line = document.createElement('div');
             line.className = "log-line py-1.5 px-2 font-mono border-b border-white/5 whitespace-pre-wrap";
-            
+
             let formattedText = rawText;
 
             if (type === 'logs') {
@@ -690,12 +697,21 @@ function switchLogStream(type, el) {
 
             line.innerHTML = `<span class="opacity-30 mr-2">$</span>` + formattedText;
             container.appendChild(line);
-            
+
+            // --- CACHE THE LINE (Only for dhcpd.log) ---
+            if (type === 'logs') {
+                logHistoryCache.push(line.outerHTML);
+                if (logHistoryCache.length > 500) logHistoryCache.shift(); // Limit to 500 lines to save memory
+            }
         });
-        
-        win.scrollTop = win.scrollHeight;
+
+        // --- APPLY SMART SCROLL ---
+        if (isAtBottom) {
+            win.scrollTop = win.scrollHeight;
+        }
     };
-}       
+}
+
         async function controlService(a) { 
             await fetch(`/api/service/${a}`, { method: 'POST' });
             updateServiceStatus(); 
@@ -881,7 +897,7 @@ setInterval(() => {
         const activeTile = document.querySelector('.device-tile.tile-active');
         updateHeroChart(currentIp, activeTile);
     }
-}, 300000);
+}, 60000); // Update graph every minute
 
     </script>
 </body>
